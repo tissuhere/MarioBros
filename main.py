@@ -8,13 +8,14 @@ import gym
 import gym_super_mario_bros
 from gym.wrappers import FrameStack, GrayScaleObservation, TransformObservation
 from nes_py.wrappers import JoypadSpace
+from gym_super_mario_bros.actions import SIMPLE_MOVEMENT
 
 from metrics import MetricLogger
 from agent import Mario
 from wrappers import ResizeObservation, SkipFrame
 
 # Initialize Super Mario environment
-env = gym_super_mario_bros.make('SuperMarioBros-1-1-v0')
+env = gym_super_mario_bros.make('SuperMarioBros-1-1-v3')
 
 # Limit the action-space to
 #   0. walk right
@@ -42,7 +43,7 @@ mario = Mario(state_dim=(4, 84, 84), action_dim=env.action_space.n, save_dir=sav
 
 logger = MetricLogger(save_dir)
 
-episodes = 40000
+episodes = 1000
 
 ### for Loop that train the model num_episodes times by playing the game
 for e in range(episodes):
@@ -85,3 +86,4 @@ for e in range(episodes):
             epsilon=mario.exploration_rate,
             step=mario.curr_step
         )
+mario.save()

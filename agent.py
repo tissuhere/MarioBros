@@ -10,20 +10,20 @@ class Mario:
     def __init__(self, state_dim, action_dim, save_dir, checkpoint=None):
         self.state_dim = state_dim
         self.action_dim = action_dim
-        self.memory = deque(maxlen=100000)
-        self.batch_size = 32
+        self.memory = deque(maxlen=25000)
+        self.batch_size = 16
 
         self.exploration_rate = 1
-        self.exploration_rate_decay = 0.99999975
+        self.exploration_rate_decay = 0.9999975
         self.exploration_rate_min = 0.1
         self.gamma = 0.9
 
         self.curr_step = 0
-        self.burnin = 1e5  # min. experiences before training
-        self.learn_every = 3   # no. of experiences between updates to Q_online
-        self.sync_every = 1e4   # no. of experiences between Q_target & Q_online sync
+        self.burnin = 5e4  # min. experiences before training
+        self.learn_every = 3  # no. of experiences between updates to Q_online
+        self.sync_every = 1e4  # no. of experiences between Q_target & Q_online sync
 
-        self.save_every = 5e5   # no. of experiences between saving Mario Net
+        self.save_every = 5e5  # no. of experiences between saving Mario Net
         self.save_dir = save_dir
 
         self.use_cuda = torch.cuda.is_available()
@@ -35,9 +35,8 @@ class Mario:
         if checkpoint:
             self.load(checkpoint)
 
-        self.optimizer = torch.optim.Adam(self.net.parameters(), lr=0.00025)
-        self.loss_fn = torch.nn.SmoothL1Loss()
-
+        self.optimizer = torch.optim.Adam(self.net.parameters(), lr=0.002)
+        self.loss_fn = torch.nn.MSELoss()
 
     def act(self, state):
         """
@@ -83,9 +82,7 @@ class Mario:
         action = torch.LongTensor([action]).cuda() if self.use_cuda else torch.LongTensor([action])
         reward = torch.DoubleTensor([reward]).cuda() if self.use_cuda else torch.DoubleTensor([reward])
         done = torch.BoolTensor([done]).cuda() if self.use_cuda else torch.BoolTensor([done])
-
-        self.memory.append( (state, next_state, action, reward, done,) )
-
+        self.memory.append((state, next_state, action, reward, done,))
 
     def recall(self):
         """
@@ -95,11 +92,9 @@ class Mario:
         state, next_state, action, reward, done = map(torch.stack, zip(*batch))
         return state, next_state, action.squeeze(), reward.squeeze(), done.squeeze()
 
-
     def td_estimate(self, state, action):
-        current_Q = self.net(state, model='online')[np.arange(0, self.batch_size), action] # Q_online(s,a)
+        current_Q = self.net(state, model='online')[np.arange(0, self.batch_size), action]  # Q_online(s,a)
         return current_Q
-
 
     @torch.no_grad()
     def td_target(self, reward, next_state, done):
@@ -108,18 +103,15 @@ class Mario:
         next_Q = self.net(next_state, model='target')[np.arange(0, self.batch_size), best_action]
         return (reward + (1 - done.float()) * self.gamma * next_Q).float()
 
-
-    def update_Q_online(self, td_estimate, td_target) :
+    def update_Q_online(self, td_estimate, td_target):
         loss = self.loss_fn(td_estimate, td_target)
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
         return loss.item()
 
-
     def sync_Q_target(self):
         self.net.target.load_state_dict(self.net.online.state_dict())
-
 
     def learn(self):
         if self.curr_step % self.sync_every == 0:
@@ -148,7 +140,6 @@ class Mario:
 
         return (td_est.mean().item(), loss)
 
-
     def save(self):
         save_path = self.save_dir / f"mario_net_{int(self.curr_step // self.save_every)}.chkpt"
         torch.save(
@@ -159,7 +150,6 @@ class Mario:
             save_path
         )
         print(f"MarioNet saved to {save_path} at step {self.curr_step}")
-
 
     def load(self, load_path):
         if not load_path.exists():
